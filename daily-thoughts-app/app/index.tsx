@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, StyleSheet, View, TextInput, Button, Text, TouchableOpacity } from 'react-native';
 import { supabase } from '../supabase';
+import { router } from 'expo-router';
 
 export default function AuthScreen() {
   // This state variable flips the screen between Login and Register modes
@@ -10,6 +11,22 @@ export default function AuthScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+useEffect(() => {
+    // Check if there is already a saved login token on the phone
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace('/feed'); // Skip to feed!
+      }
+    });
+
+    // Listen for any changes (like them clicking 'Log In')
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.replace('/feed');
+      }
+    });
+  }, []);
 
   async function handleRegister() {
     if (!email || !username || !password) {
@@ -55,7 +72,7 @@ export default function AuthScreen() {
     if (signInError) {
       Alert.alert('Error', signInError.message);
     } else {
-      Alert.alert('Success', 'You are logged in!');
+      router.replace('../feed');
     }
     
     setLoading(false);
