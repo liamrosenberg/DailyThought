@@ -3,11 +3,11 @@ import {
   View, Text, TextInput, Button, FlatList, StyleSheet, 
   Alert, TouchableOpacity, KeyboardAvoidingView, Platform 
 } from 'react-native';
-import { supabase } from '../supabase';
+import { supabase } from '../supabaseClient';
 import { router, Stack } from 'expo-router'; 
 import { User } from '@supabase/supabase-js';
 
-// --- NEW: Notification Imports ---
+// --- Notification Imports ---
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
@@ -35,7 +35,7 @@ export default function FeedScreen() {
     });
   }, []);
 
-  // 2. NEW: Trigger Notification Permission Check when user is found
+  // 2. Trigger Notification Permission Check when user is found
   useEffect(() => {
     if (currentUser) {
       registerForPushNotificationsAsync().then(token => {
@@ -54,7 +54,8 @@ export default function FeedScreen() {
         profiles ( username ),
         replies ( count )
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (error) {
       Alert.alert('Error fetching feed', error.message);
@@ -106,8 +107,7 @@ export default function FeedScreen() {
     router.replace('/');
   }
 
-  // --- NEW: Notification Helper Functions ---
-
+  // --- Notification Helper Functions ---
   async function saveTokenToDatabase(token: string) {
     await supabase
       .from('profiles')
@@ -132,6 +132,29 @@ export default function FeedScreen() {
     return token;
   }
 
+  // --- Username Checking Helper ---
+  async function checkUsernameAvailability(desiredUsername: string) {
+    // 1. Convert to lowercase so "John" and "john" can't both exist
+    const cleanUsername = desiredUsername.toLowerCase().trim();
+
+    // 2. Ask Supabase if anyone has this exact name
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', cleanUsername)
+      .maybeSingle(); 
+
+    if (error) {
+      console.error("Error checking username:", error);
+      return false; // Assume unavailable if the network fails
+    }
+
+    // 3. If data is null, the name is free! If data exists, it's taken.
+    const isAvailable = data === null;
+    return isAvailable;
+  }
+  
+  // --- UI Render ---
   const renderThought = ({ item }: { item: Thought }) => {
     const date = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const commentCount = item.replies?.[0]?.count || 0;
@@ -159,7 +182,6 @@ export default function FeedScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} 
     >
-      {/* NEW: Native Header Config (This removes the gap) */}
       <Stack.Screen 
         options={{ 
           title: 'Daily Thoughts',
@@ -176,7 +198,6 @@ export default function FeedScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderThought}
         contentContainerStyle={styles.feed}
-        // NEW: Hooked up Pull-to-Refresh
         refreshing={refreshing}
         onRefresh={onRefresh}
       />
@@ -199,7 +220,6 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f2f5' },
-  // Removed 'header' and 'paddingTop' styles since Stack.Screen handles it now
   title: { fontSize: 20, fontWeight: 'bold' },
   signOutText: { color: 'red', fontWeight: 'bold' },
   feed: { padding: 15 },

@@ -1,48 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, StyleSheet, View, TextInput, Button, Text, TouchableOpacity } from 'react-native';
-import { supabase } from '../supabase';
+import { 
+  Alert, StyleSheet, View, TextInput, Button, Text, TouchableOpacity, 
+  KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard 
+} from 'react-native';
+import { supabase } from '../supabaseClient';
 import { router } from 'expo-router';
 
+// 1. Define the fake domain for the Ghost Email trick
+const DUMMY_DOMAIN = '@dailythoughts.local';
+
 export default function AuthScreen() {
-  // This state variable flips the screen between Login and Register modes
   const [isLogin, setIsLogin] = useState(true); 
-  
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-useEffect(() => {
-    // Check if there is already a saved login token on the phone
+  // Helper to ensure usernames are standardized
+  const getCleanUsername = () => username.toLowerCase().trim();
+  const getGhostEmail = () => `${getCleanUsername()}${DUMMY_DOMAIN}`;
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        router.replace('/feed'); // Skip to feed!
-      }
+      if (session) router.replace('/feed');
     });
 
-    // Listen for any changes (like them clicking 'Log In')
     supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        router.replace('/feed');
-      }
+      if (session) router.replace('/feed');
     });
   }, []);
 
   async function handleRegister() {
-    if (!email || !username || !password) {
+    if (!username || !password) {
       Alert.alert('Error', 'Please fill out all fields.');
       return;
     }
+    if (username.length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters.');
+      return;
+    }
+
     setLoading(true);
-    // Note: We are saving the username into Supabase's metadata system here
-    const { error } = await supabase.auth.signUp({
-      email,
+    const cleanUsername = getCleanUsername();
+
+    // Sign up using the Ghost Email AND send the username to the database trigger
+    const { data, error } = await supabase.auth.signUp({
+      email: getGhostEmail(),
       password,
-      options: { data: { username: username } }
+      options: {
+        data: {
+          username: cleanUsername,
+        }
+      }
     });
     
-    if (error) Alert.alert('Error', error.message);
-    else Alert.alert('Success', 'Registered! You can now log in.');
+    if (error) {
+      let msg = error.message;
+      if (msg.includes('email')) msg = msg.replace('email', 'username');
+      Alert.alert('Registration Error', msg);
+    } else {
+      Alert.alert('Success', 'Successfully registered!');
+      setIsLogin(true); // Automatically flip back to login mode
+    }
     setLoading(false);
   }
 
@@ -53,104 +71,84 @@ useEffect(() => {
     }
     setLoading(true);
     
-    // 1. Ask the database for the hidden email attached to this username
-    const { data: userEmail, error: lookupError } = await supabase
-      .rpc('get_user_email', { p_username: username });
-
-    if (lookupError || !userEmail) {
-      Alert.alert('Error', 'Username not found.');
-      setLoading(false);
-      return;
-    }
-
-    // 2. Log them in using that hidden email
+    // Log them in using the generated Ghost Email (No RPC lookup needed anymore!)
     const { error: signInError } = await supabase.auth.signInWithPassword({ 
-      email: userEmail, 
+      email: getGhostEmail(), 
       password: password 
     });
     
     if (signInError) {
-      Alert.alert('Error', signInError.message);
+      Alert.alert('Error', 'Invalid username or password.');
     } else {
-      router.replace('../feed');
+      router.replace('/feed');
     }
     
     setLoading(false);
   }
 
-  async function handleForgotPassword() {
-    Alert.alert('Forgot Password', 'We will build the password reset flow soon!');
-  }
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Daily Thoughts</Text>
-      
-      {/* If they are registering, show the Email field */}
-      {!isLogin && (
-        <TextInput
-          style={styles.input}
-          placeholder="Email address"
-          placeholderTextColor="#888"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-      )}
+    // Wrap the entire screen to prevent the keyboard from blocking inputs
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      {/* Allows tapping outside the inputs to dismiss the keyboard */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>Daily Thoughts</Text>
 
-      {/* Both Login and Register need a Username field */}
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        placeholderTextColor="#888"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            placeholderTextColor="#888"
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry={true}
-        autoCapitalize="none"
-      />
-      
-      {/* Show the primary action button based on the mode */}
-      <View style={styles.buttonContainer}>
-        <Button 
-          title={isLogin ? "Log In" : "Register"} 
-          disabled={loading} 
-          onPress={isLogin ? handleLogin : handleRegister} 
-        />
-      </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={true}
+            autoCapitalize="none"
+          />
+          
+          <View style={styles.buttonContainer}>
+            <Button 
+              title={loading ? "..." : (isLogin ? "Log In" : "Register")} 
+              disabled={loading} 
+              onPress={isLogin ? handleLogin : handleRegister} 
+            />
+          </View>
 
-      {/* Forgot Password (Only show on Login screen) */}
-      {isLogin && (
-        <TouchableOpacity onPress={handleForgotPassword}>
-          <Text style={styles.linkText}>Forgot your password?</Text>
-        </TouchableOpacity>
-      )}
+          <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.switchModeContainer}>
+            <Text style={styles.switchModeText}>
+              {isLogin ? "Don't have an account? Register here." : "Already have an account? Log in."}
+            </Text>
+          </TouchableOpacity>
 
-      {/* The Toggle Switch at the bottom */}
-      <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.switchModeContainer}>
-        <Text style={styles.switchModeText}>
-          {isLogin ? "Don't have an account? Register here." : "Already have an account? Log in."}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
   title: {
     fontSize: 28,
@@ -164,17 +162,12 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 15,
     borderRadius: 8,
-    backgroundColor: '#f9f9f9'
+    backgroundColor: '#f9f9f9',
+    fontSize: 16,
   },
   buttonContainer: {
     marginBottom: 15,
     marginTop: 10,
-  },
-  linkText: {
-    color: '#0066cc',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontSize: 14,
   },
   switchModeContainer: {
     marginTop: 20,
