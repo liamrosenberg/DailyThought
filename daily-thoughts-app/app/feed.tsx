@@ -26,11 +26,17 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // --- NEW: Streak State ---
+  const [streak, setStreak] = useState(0);
 
   // 1. Initial Load
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUser(user);
+      if (user) {
+        fetchUserProfile(user.id); // Fetch streak on load
+      }
       fetchThoughts();
     });
   }, []);
@@ -43,6 +49,19 @@ export default function FeedScreen() {
       });
     }
   }, [currentUser]);
+
+  // --- NEW: Fetch Profile Info (Streak) ---
+  async function fetchUserProfile(userId: string) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('current_streak')
+      .eq('id', userId)
+      .single();
+      
+    if (data) {
+      setStreak(data.current_streak || 0);
+    }
+  }
 
   async function fetchThoughts() {
     const { data, error } = await supabase
@@ -77,6 +96,7 @@ export default function FeedScreen() {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
+    // 1. Check if they hit their daily limit
     const { count } = await supabase
       .from('thoughts')
       .select('*', { count: 'exact', head: true })
@@ -89,16 +109,62 @@ export default function FeedScreen() {
       return;
     }
 
+    // 2. Post the thought
     const { error: insertError } = await supabase
       .from('thoughts')
       .insert({ user_id: currentUser.id, content: newThought });
 
     if (insertError) {
       Alert.alert('Error posting', insertError.message);
-    } else {
-      setNewThought(''); 
-      fetchThoughts();   
+      setLoading(false);
+      return;
     }
+
+    // --- NEW: Calculate and update the streak ---
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_streak, last_post_date')
+      .eq('id', currentUser.id)
+      .single();
+
+    let newStreak = 1;
+    let newLastPostDate = new Date().toISOString();
+
+    if (profile) {
+      const lastPost = profile.last_post_date ? new Date(profile.last_post_date) : null;
+      const today = new Date();
+
+      if (lastPost) {
+        // Strip time to just compare the dates accurately
+        const lastPostDay = new Date(lastPost.getFullYear(), lastPost.getMonth(), lastPost.getDate());
+        const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        // Calculate difference in days
+        const diffTime = Math.abs(todayDay.getTime() - lastPostDay.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+          // Already posted today, keep streak the same
+          newStreak = profile.current_streak;
+        } else if (diffDays === 1) {
+          // Posted yesterday, increment streak!
+          newStreak = (profile.current_streak || 0) + 1;
+        } else {
+          // Missed a day, streak broken
+          newStreak = 1;
+        }
+      }
+    }
+
+    // Update the database with the new streak
+    await supabase
+      .from('profiles')
+      .update({ current_streak: newStreak, last_post_date: newLastPostDate })
+      .eq('id', currentUser.id);
+
+    setStreak(newStreak); // Update UI
+    setNewThought(''); 
+    fetchThoughts();   
     setLoading(false);
   }
 
@@ -130,28 +196,6 @@ export default function FeedScreen() {
     })).data;
     
     return token;
-  }
-
-  // --- Username Checking Helper ---
-  async function checkUsernameAvailability(desiredUsername: string) {
-    // 1. Convert to lowercase so "John" and "john" can't both exist
-    const cleanUsername = desiredUsername.toLowerCase().trim();
-
-    // 2. Ask Supabase if anyone has this exact name
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('username', cleanUsername)
-      .maybeSingle(); 
-
-    if (error) {
-      console.error("Error checking username:", error);
-      return false; // Assume unavailable if the network fails
-    }
-
-    // 3. If data is null, the name is free! If data exists, it's taken.
-    const isAvailable = data === null;
-    return isAvailable;
   }
   
   // --- UI Render ---
@@ -185,6 +229,10 @@ export default function FeedScreen() {
       <Stack.Screen 
         options={{ 
           title: 'Daily Thoughts',
+          // --- NEW: Add the streak counter to the header ---
+          headerLeft: () => (
+            <Text style={styles.streakText}>🔥 {streak}</Text>
+          ),
           headerRight: () => (
             <TouchableOpacity onPress={handleSignOut}>
               <Text style={styles.signOutText}>Sign Out</Text>
@@ -221,6 +269,8 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f2f5' },
   title: { fontSize: 20, fontWeight: 'bold' },
+  // --- NEW STYLES ---
+  streakText: { fontSize: 16, fontWeight: 'bold', marginRight: 15 },
   signOutText: { color: 'red', fontWeight: 'bold' },
   feed: { padding: 15 },
   thoughtCard: { 
