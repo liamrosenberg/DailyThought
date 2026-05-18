@@ -16,7 +16,7 @@ interface Thought {
   id: string;
   content: string;
   created_at: string;
-  profiles: { username: string };
+  profiles: { username: string; current_streak: number };
   replies: { count: number }[]; 
 }
 
@@ -70,7 +70,7 @@ export default function FeedScreen() {
         id,
         content,
         created_at,
-        profiles ( username ),
+        profiles ( username, current_streak ),
         replies ( count )
       `)
       .order('created_at', { ascending: false })
@@ -209,7 +209,9 @@ export default function FeedScreen() {
         onPress={() => router.push({ pathname: '/thought/[id]', params: { id: item.id } })}
       >
         <View style={styles.cardHeader}>
-           <Text style={styles.username}>@{item.profiles?.username || 'Unknown'}</Text>
+           <Text style={styles.username}>
+             @{item.profiles?.username || 'Unknown'} 🔥 {item.profiles?.current_streak || 0}
+           </Text>
            <Text style={styles.timestamp}>{date}</Text>
         </View>
         <Text style={styles.content}>{item.content}</Text>

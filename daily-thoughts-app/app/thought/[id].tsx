@@ -9,14 +9,14 @@ interface Reply {
   id: string;
   content: string;
   created_at: string;
-  profiles: { username: string };
+  profiles: { username: string; current_streak: number }; // <-- Added current_streak
 }
 
 interface Thought {
   id: string;
   content: string;
   created_at: string;
-  profiles: { username: string };
+  profiles: { username: string; current_streak: number }; // <-- Added current_streak
 }
 
 export default function ThreadScreen() {
@@ -38,7 +38,7 @@ export default function ThreadScreen() {
     // 1. Fetch the main thought
     const { data: thoughtData } = await supabase
       .from('thoughts')
-      .select(`id, content, created_at, profiles(username)`)
+      .select(`id, content, created_at, profiles(username, current_streak)`) // <-- Updated
       .eq('id', id)
       .single();
     
@@ -47,9 +47,9 @@ export default function ThreadScreen() {
     // 2. Fetch all replies attached to this thought ID
     const { data: replyData } = await supabase
       .from('replies')
-      .select(`id, content, created_at, profiles(username)`)
+      .select(`id, content, created_at, profiles(username, current_streak)`) // <-- Updated
       .eq('thought_id', id)
-      .order('created_at', { ascending: true }); // Oldest first, like a real text thread
+      .order('created_at', { ascending: true }); 
 
     setReplies(replyData as any as Reply[] || []);
   }
@@ -77,7 +77,9 @@ export default function ThreadScreen() {
 
   const renderReply = ({ item }: { item: Reply }) => (
     <View style={styles.replyCard}>
-      <Text style={styles.replyUsername}>@{item.profiles?.username || 'Unknown'}</Text>
+      <Text style={styles.replyUsername}>
+        @{item.profiles?.username || 'Unknown'} 🔥 {item.profiles?.current_streak || 0}
+      </Text>
       <Text style={styles.replyContent}>{item.content}</Text>
     </View>
   );
@@ -95,7 +97,9 @@ export default function ThreadScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Accounts for Expo Router's top back-button header
     >
       <View style={styles.mainThoughtCard}>
-        <Text style={styles.mainUsername}>@{mainThought.profiles?.username || 'Unknown'}</Text>
+        <Text style={styles.mainUsername}>
+          @{mainThought.profiles?.username || 'Unknown'} 🔥 {mainThought.profiles?.current_streak || 0}
+        </Text>
         <Text style={styles.mainContent}>{mainThought.content}</Text>
       </View>
 
