@@ -92,8 +92,6 @@ export default function AuthScreen() {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Allows tapping outside the inputs to dismiss the keyboard */}
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView 
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
@@ -135,7 +133,6 @@ export default function AuthScreen() {
           </TouchableOpacity>
 
         </ScrollView>
-      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
