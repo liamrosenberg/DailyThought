@@ -23,8 +23,13 @@
       "package": "com.mariokart7.dailythoughtsapp"
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single", 
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro",
+      "display": "standalone",
+      "shortName": "Thoughts",
+      "themeColor": "#E6F4FE",
+      "backgroundColor": "#ffffff"
     },
     "plugins": [
       "expo-router",
