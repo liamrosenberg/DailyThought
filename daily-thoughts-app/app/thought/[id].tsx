@@ -58,6 +58,7 @@ export default function ThreadScreen() {
     if (!newReply.trim() || !currentUser) return;
     setLoading(true);
 
+    // 1. Post the reply
     const { error } = await supabase
       .from('replies')
       .insert({
@@ -68,10 +69,56 @@ export default function ThreadScreen() {
 
     if (error) {
       Alert.alert('Error', error.message);
-    } else {
-      setNewReply(''); // Clear the box
-      fetchThread();   // Refresh the replies to show the new one!
+      setLoading(false);
+      return;
     }
+
+    // 2. Calculate and update the streak
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('current_streak, last_post_date')
+      .eq('id', currentUser.id)
+      .single();
+
+    let newStreak = 1;
+    let newLastPostDate = new Date().toISOString();
+
+    if (profile) {
+      const lastPost = profile.last_post_date ? new Date(profile.last_post_date) : null;
+      const today = new Date();
+
+      if (lastPost) {
+        const lastPostDay = new Date(lastPost.getFullYear(), lastPost.getMonth(), lastPost.getDate());
+        const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        const diffTime = Math.abs(todayDay.getTime() - lastPostDay.getTime());
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) {
+          // Already posted today, keep streak the same (default to 1 if it was 0)
+          newStreak = profile.current_streak || 1; 
+        } else if (diffDays === 1) {
+          // Posted yesterday, increment streak!
+          newStreak = (profile.current_streak || 0) + 1;
+        } else {
+          // Missed a day, streak broken
+          newStreak = 1;
+        }
+      }
+    }
+
+    // 3. Save the new streak to the database
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ current_streak: newStreak, last_post_date: newLastPostDate })
+      .eq('id', currentUser.id);
+
+    if (updateError) {
+      console.error("Streak Update Error:", updateError.message);
+    }
+
+    setNewReply(''); 
+    fetchThread();   // Refresh the UI!
     setLoading(false);
   }
 

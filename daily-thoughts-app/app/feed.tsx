@@ -121,6 +121,7 @@ export default function FeedScreen() {
     }
 
     // --- NEW: Calculate and update the streak ---
+    // --- Calculate and update the streak ---
     const { data: profile } = await supabase
       .from('profiles')
       .select('current_streak, last_post_date')
@@ -135,34 +136,33 @@ export default function FeedScreen() {
       const today = new Date();
 
       if (lastPost) {
-        // Strip time to just compare the dates accurately
         const lastPostDay = new Date(lastPost.getFullYear(), lastPost.getMonth(), lastPost.getDate());
         const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         
-        // Calculate difference in days
         const diffTime = Math.abs(todayDay.getTime() - lastPostDay.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); // Changed to Math.round
 
         if (diffDays === 0) {
-          // Already posted today, keep streak the same
-          newStreak = profile.current_streak;
+          newStreak = profile.current_streak || 1;
         } else if (diffDays === 1) {
-          // Posted yesterday, increment streak!
           newStreak = (profile.current_streak || 0) + 1;
         } else {
-          // Missed a day, streak broken
           newStreak = 1;
         }
       }
     }
 
     // Update the database with the new streak
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ current_streak: newStreak, last_post_date: newLastPostDate })
       .eq('id', currentUser.id);
 
-    setStreak(newStreak); // Update UI
+    if (updateError) {
+      console.error("Streak Update Error:", updateError.message);
+    }
+
+    setStreak(newStreak); // Update UI Header
     setNewThought(''); 
     fetchThoughts();   
     setLoading(false);
