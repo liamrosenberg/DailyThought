@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { supabase } from '../../supabase';
+import { supabase } from '../../supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 // The Blueprints
