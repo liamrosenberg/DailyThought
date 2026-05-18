@@ -8,6 +8,13 @@ import { router } from 'expo-router';
 
 // 1. Define the fake domain for the Ghost Email trick
 const DUMMY_DOMAIN = '@dailythoughts.local';
+const safeAlert = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true); 
