@@ -38,11 +38,11 @@ export default function AuthScreen() {
 
   async function handleRegister() {
     if (!username || !password) {
-      Alert.alert('Error', 'Please fill out all fields.');
+      safeAlert('Error', 'Please fill out all fields.');
       return;
     }
     if (username.length < 3) {
-      Alert.alert('Error', 'Username must be at least 3 characters.');
+      safeAlert('Error', 'Username must be at least 3 characters.');
       return;
     }
 
@@ -63,9 +63,9 @@ export default function AuthScreen() {
     if (error) {
       let msg = error.message;
       if (msg.includes('email')) msg = msg.replace('email', 'username');
-      Alert.alert('Registration Error', msg);
+      safeAlert('Registration Error', msg);
     } else {
-      Alert.alert('Success', 'Successfully registered!');
+      safeAlert('Success', 'Successfully registered!');
       setIsLogin(true); // Automatically flip back to login mode
     }
     setLoading(false);
@@ -73,7 +73,7 @@ export default function AuthScreen() {
 
   async function handleLogin() {
     if (!username || !password) {
-      Alert.alert('Error', 'Please enter your username and password.');
+      safeAlert('Error', 'Please enter your username and password.');
       return;
     }
     setLoading(true);
@@ -85,7 +85,7 @@ export default function AuthScreen() {
     });
     
     if (signInError) {
-      Alert.alert('Error', 'Invalid username or password.');
+      safeAlert('Error', 'Invalid username or password.');
     } else {
       router.replace('/feed');
     }
@@ -97,7 +97,7 @@ export default function AuthScreen() {
     // Wrap the entire screen to prevent the keyboard from blocking inputs
     <KeyboardAvoidingView 
       style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
         <ScrollView 
           contentContainerStyle={styles.scrollContainer}

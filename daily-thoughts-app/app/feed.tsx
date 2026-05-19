@@ -225,7 +225,7 @@ export default function FeedScreen() {
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} 
     >
       <Stack.Screen 
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15, 
-    paddingBottom: Platform.OS === 'ios' ? 35 : 20, 
+    paddingBottom: 80,
     backgroundColor: '#fff', 
     borderTopWidth: 1,
     borderColor: '#ddd'

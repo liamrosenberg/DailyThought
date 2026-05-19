@@ -208,6 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderColor: '#ddd',
+    marginBottom: 20, // Space below the compose box
     flexDirection: 'row',
     alignItems: 'center',
   },
